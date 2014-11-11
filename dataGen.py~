@@ -1,0 +1,187 @@
+﻿#!/usr/bin/env python
+
+import pyfits
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+from scipy import signal, misc
+
+arch   = pyfits.open('blank.fits')
+hdr    = arch[0].header
+img    = arch[0].data
+flux20 = hdr['FLUX20']
+
+#Contadores de objetos agregados a los fits
+starCounter=0
+galaxyCounter=0
+dataTable=[]
+
+ref_pix_hor   = float(hdr['CRPIX1']) # Column Pixel Coordinate of Ref. Pixel  
+ref_pix_ver   = float(hdr['CRPIX2']) # Row Pixel Coordinate of Ref. Pixel
+ref_pix_ra    = float(hdr['CRVAL1']) # RA at Reference Pixel
+ref_pix_dec   = float(hdr['CRVAL2']) # DEC at Reference Pixel
+
+delta_ra_col  = float(hdr['CD1_1'])  # RA  degrees per column pixel
+delta_ra_row  = float(hdr['CD1_2'])  # RA  degrees per row pixel
+delta_dec_col = float(hdr['CD2_1'])  # DEC degrees per column pixel
+delta_dec_row = float(hdr['CD2_2'])  # DEC degrees per row pixel
+
+# De pixeles (ver,hor) a (ra,dec)
+def pix_2_ra_dec(ver,hor):
+
+    diff_ver = ver - ref_pix_ver
+    diff_hor = hor - ref_pix_hor
+
+    diff_ra  = (diff_hor * delta_ra_col) + diff_ver * delta_ra_row
+    diff_dec =  diff_hor * delta_dec_col  + (diff_ver * delta_dec_row)
+
+    calc_ra  = ref_pix_ra  + diff_ra
+    calc_dec = ref_pix_dec + diff_dec
+
+    return (calc_ra,calc_dec)
+
+# De (ra,dec) a pixeles (ver,hor)
+def ra_dec_2_pix(ra,dec):
+
+    diff_ra  = ra  - ref_pix_ra
+    diff_dec = dec - ref_pix_dec
+
+    diff_ver = (diff_dec/delta_dec_col - diff_ra/delta_ra_col)/(delta_dec_row/delta_dec_col - delta_ra_row/delta_ra_col)
+    diff_hor = (diff_dec/delta_dec_row - diff_ra/delta_ra_row)/(delta_dec_col/delta_dec_row - delta_ra_col/delta_ra_row)
+
+    calc_ver = ref_pix_ver + diff_ver
+    calc_hor = ref_pix_hor + diff_hor
+
+    return (calc_ver,calc_hor)
+
+def plot_image(image,interpolation="nearest",log_scale=False,title=None):
+    ''' buenos colores
+	'hot' 'gray' 'Greys' 'bone' 'copper' 'gist_heat' 'pink' 'summer' 'afmhot'
+    '''
+    if log_scale:
+       min_value = np.min(image)
+       if min_value <= 0: image2 = image + np.abs(min_value) + 10.0
+       else: image2 = image - min_value + 10.0
+       plt.imshow(np.log(image2),interpolation=interpolation)
+       plt.set_cmap('pink')
+       plt.colorbar()
+    else:
+       plt.imshow(image,interpolation=interpolation)
+       plt.set_cmap('pink') 
+       plt.colorbar()
+
+    if title != None:
+       plt.title(str(title))
+
+    plt.show()
+    return
+
+# Entrega flujo usando la formula m-m0=-2.5*log(F/F0)
+def mToCounts(m,m0,F0):
+    F = F0*math.exp((m0-m)/2.5)
+    return F
+
+#Inserta una estrella con los parametros m,RA,DEC en la imagen hdu
+def addStar(hdu,m,RA,DEC):
+    ver,hor = ra_dec_2_pix(RA,DEC)
+    max_ver,max_hor = hdu.shape
+    if 0<=ver<max_ver and 0<hor<max_hor:
+        cuentas = mToCounts(m,20,flux20)
+        hdu[ver][hor]=cuentas
+    return
+
+#Lee un catalogo de estrellas y los agrega a la imagen fits
+def addStellarCatalog (hdu, catalog):
+    fp = open(catalog, 'r')
+    counter=0
+    for line in fp:
+        counter+=1
+        if ((counter%100)==0):
+            print("counter={}".format(counter))
+                  
+        obj,RA,DEC,r_mag,SED,indx,star = line.split()
+        addStar(hdu,float(r_mag),float(RA),float(DEC))
+    return
+
+#Funcion para calcular radio eliptico dados x e y
+def getER(x,y,xc,yc,el,theta):
+    return math.sqrt(((x-xc)*math.cos(theta)-(y-yc)*math.sin(theta))**2+( (((x-xc)*math.sin(theta)-(y-yc)*math.cos(theta))**2)/((1-el)**2)))
+
+#Agrega una galaxia a la imagen hdu
+def addGalaxy (hdu, m, RA, DEC, n, Re, el, theta):
+    #obtener coordenadas
+    ver,hor = ra_dec_2_pix(RA,DEC)
+    max_ver,max_hor = hdu.shape
+    if 0<=ver<max_ver and 0<=hor<max_hor:
+        #obtener cuentas
+        cuentas = mToCounts(m,20,flux20)
+        #calcular I0
+        bn=2*n-0.324
+        I0 = (cuentas*(math.pow(bn,2*n)))/(math.pow(Re,2)*2*math.pi*n*(1-el)*math.gamma(2*n))
+        hdu[ver][hor]=I0
+	
+	#Agregar datos a la tabla de datos dataTable
+        #sacar delta max para delimitar cuadro a pintar
+        #dmax=int(np.maximum(Re,Re*(1-el))*(2))
+        #Para optimizar, se ocupan coordenadas polares, dejando de dibujar cuando las magnitudes sean cero.
+        ang=0
+        dang=2*math.pi/50
+        while ang<2*math.pi:
+            #print("ang={}".format(ang))
+            d=1
+            Ier=I0
+            while Ier>0.1:
+                x=hor+d*math.cos(ang)
+                y=ver+d*math.sin(ang)
+                if(d>1000):
+                    print("ang={} d={} ({},{})".format(ang,d,x,y))
+                
+                d+=1
+                if not (0<=y<max_ver and 0<=x<max_hor):
+                    break
+                Er=getER(x,y,hor,ver,el,theta)
+                Ier=I0*math.exp(-bn*(math.pow((Er/Re),(1/n))))
+                if hdu[y][x]<Ier:
+                    hdu[y][x]=Ier
+            ang+=dang
+    return
+
+#Lee un catalogo de galaxias y los agrega a la imagen fits
+def addGalaxyCatalog (hdu, catalog):
+    #contador solo para no cargar el catalogo completo en las pruebas
+    fp = open(catalog, 'r')
+    counter=0
+    for line in fp:
+        counter+=1
+        if counter%1000==0:
+            print("counter={}".format(counter))
+        #print(line)
+        obj,RA,DEC,r_mag,SED,redshift,galaxy,n,Re,el,theta=line.split()
+        #if float(n)<5 and float(r_mag)>5:
+        #    continue
+        addGalaxy(hdu,float(r_mag),float(RA),float(DEC),float(n),float(Re),float(el),float(theta))
+    return counter
+
+print(np.min(img),np.max(img))
+addStellarCatalog(img,"stellar.dat")
+
+arch.writeto('stellar.fits')
+
+#convolvePSF(img,50)
+print(np.min(img),np.max(img),np.max(img)/2)
+plot_image(img, log_scale=True)
+plot_image(img)
+#addBackground(img,np.max(img)/2)
+#print(np.min(img),np.max(img))
+#plot_image(img, log_scale=True)
+#plot_image(img)
+
+#cc=addGalaxyCatalog(img,"galaxy.dat")
+addGalaxyCatalog(img,"galaxy.dat")
+arch.writeto('galaxy.fits')
+#print(cc)
+
+
+
+#addStellarCatalog(img,"stellar.dat")
+#plot_image(img, log_scale=True)    
