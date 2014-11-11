@@ -11,9 +11,7 @@ hdr    = arch[0].header
 img    = arch[0].data
 flux20 = hdr['FLUX20']
 
-#Contadores de objetos agregados a los fits
-starCounter=0
-galaxyCounter=0
+
 #dataTable=[[RadioEfectivo,Intensidad,0=star 1=galaxy]]
 dataTable=[]
 
@@ -91,6 +89,8 @@ def addStar(hdu,m,RA,DEC):
         hdu[ver][hor]=cuentas
 	#Agregar datos a la tabla de datos dataTable
 	dataTable.append([1,cuentas,0])
+	global starCounter
+	starCounter+=1
     return
 
 #Lee un catalogo de estrellas y los agrega a la imagen fits
@@ -125,6 +125,8 @@ def addGalaxy (hdu, m, RA, DEC, n, Re, el, theta):
 
 	#Agregar datos a la tabla de datos dataTable
 	dataTable.append([Re,I0,1])
+	global galaxyCounter
+	galaxyCounter+=1
         #sacar delta max para delimitar cuadro a pintar
         #dmax=int(np.maximum(Re,Re*(1-el))*(2))
         #Para optimizar, se ocupan coordenadas polares, dejando de dibujar cuando las magnitudes sean cero.
@@ -166,28 +168,19 @@ def addGalaxyCatalog (hdu, catalog):
         addGalaxy(hdu,float(r_mag),float(RA),float(DEC),float(n),float(Re),float(el),float(theta))
     return counter
 
-print(np.min(img),np.max(img))
-addStellarCatalog(img,"stellar.dat")
+#Contadores de objetos agregados a los fits
+starCounter=0
+galaxyCounter=0
 
+addStellarCatalog(img,"stellar.dat")
 arch.writeto('stellar.fits')
 
-#convolvePSF(img,50)
-#print(np.min(img),np.max(img),np.max(img)/2)
-plot_image(img, log_scale=True)
-#plot_image(img)
-#addBackground(img,np.max(img)/2)
-#print(np.min(img),np.max(img))
-#plot_image(img, log_scale=True)
-#plot_image(img)
-
-#cc=addGalaxyCatalog(img,"galaxy.dat")
 addGalaxyCatalog(img,"galaxy.dat")
 arch.writeto('galaxy.fits')
 
-print(dataTable)
-#print(cc)
-
-
-
-#addStellarCatalog(img,"stellar.dat")
-#plot_image(img, log_scale=True)    
+f=open('datos.dat','w')
+f.write(str(starCounter)+" "+str(galaxyCounter)+"\n")
+for dataRow in dataTable:
+	f.write(str(dataRow[0])+" "+str(dataRow[1])+" "+str(dataRow[2])+"\n")
+f.close()
+    
