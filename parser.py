@@ -11,6 +11,7 @@ def getData(archivo):
 		for dato in datos:
 			data.append(float(dato))
 		dataTable.append(data)
+	f.close()
 	return float(cant[0]),float(cant[1]),dataTable
 
 #estrellas,galaxias,tabla = getData("datos.dat")
