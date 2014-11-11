@@ -12,7 +12,7 @@ img    = arch[0].data
 flux20 = hdr['FLUX20']
 
 
-#dataTable=[[RadioEfectivo,Intensidad,0=star 1=galaxy]]
+#dataTable=[[RadioEfectivo,Intensidad,pixHor,pixVer,0=star 1=galaxy]]
 dataTable=[]
 
 ref_pix_hor   = float(hdr['CRPIX1']) # Column Pixel Coordinate of Ref. Pixel  
@@ -88,7 +88,7 @@ def addStar(hdu,m,RA,DEC):
         cuentas = mToCounts(m,20,flux20)
         hdu[ver][hor]=cuentas
 	#Agregar datos a la tabla de datos dataTable
-	dataTable.append([1,cuentas,0])
+	dataTable.append([1,cuentas,hor,ver,0])
 	global starCounter
 	starCounter+=1
     return
@@ -124,7 +124,7 @@ def addGalaxy (hdu, m, RA, DEC, n, Re, el, theta):
         hdu[ver][hor]=I0
 
 	#Agregar datos a la tabla de datos dataTable
-	dataTable.append([Re,I0,1])
+	dataTable.append([Re,I0,hor,ver,1])
 	global galaxyCounter
 	galaxyCounter+=1
         #sacar delta max para delimitar cuadro a pintar
@@ -181,6 +181,6 @@ arch.writeto('galaxy.fits')
 f=open('datos.dat','w')
 f.write(str(starCounter)+" "+str(galaxyCounter)+"\n")
 for dataRow in dataTable:
-	f.write(str(dataRow[0])+" "+str(dataRow[1])+" "+str(dataRow[2])+"\n")
+	f.write(str(dataRow[0])+" "+str(dataRow[1])+" "+str(dataRow[2])+" "+str(dataRow[3])+" "+str(dataRow[4])+"\n")
 f.close()
     
