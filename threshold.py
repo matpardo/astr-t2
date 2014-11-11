@@ -39,3 +39,39 @@ def thresholding(data,k):
     pl.show()
 
     return source_pos,threshold
+
+# Para test
+
+def noise_values(signal):
+
+    data = signal[:]
+    while True:
+       noise = []
+       sigma = np.std(data)
+       for val in data:
+           if val < 3 * sigma:
+              noise.append(val)
+       if len(noise) == len(data): break
+       data = noise[:]
+    
+    return np.mean(data),np.std(data)
+
+def gaussian(x,stdev=1.0,mean=0.0):
+
+    return np.exp(-1.0*(x-mean)**2.0/(2*stdev**2.0))/(stdev*np.sqrt(2*np.pi))
+
+# Señal: se tiene una gaussiana y dos deltas como fuentes
+
+N = 250
+signal = np.zeros(N)
+for i in range(65,136):
+    signal[i] = 250.0 * gaussian(i,10.0,100.0) # Fuente (intensa) entre pixeles 65 y 135
+signal[180] = 10.0 # Fuente (intensa) en pixel 180
+signal[220] = 1.5  # Fuente (débil) en pixel 220
+n_signal = signal + random.standard_normal(N) # Ruido con media 0 y desviación estándar 1
+
+# Ejemplos: se usa thresholding con k = {2.0,2.5,3.0}
+
+k = [2.0,2.5,3.0]
+for i in range(len(k)):
+    pos_sources,threshold = thresholding(n_signal,k[i])
