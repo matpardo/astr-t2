@@ -172,21 +172,9 @@ def addGalaxyCatalog (hdu, catalog):
 starCounter=0
 galaxyCounter=0
 
-print(np.min(img),np.max(img))
 addStellarCatalog(img,"stellar.dat")
-
 arch.writeto('stellar.fits')
 
-#convolvePSF(img,50)
-#print(np.min(img),np.max(img),np.max(img)/2)
-plot_image(img, log_scale=True)
-#plot_image(img)
-#addBackground(img,np.max(img)/2)
-#print(np.min(img),np.max(img))
-#plot_image(img, log_scale=True)
-#plot_image(img)
-
-#cc=addGalaxyCatalog(img,"galaxy.dat")
 addGalaxyCatalog(img,"galaxy.dat")
 arch.writeto('galaxy.fits')
 
@@ -195,10 +183,4 @@ f.write(str(starCounter)+" "+str(galaxyCounter)+"\n")
 for dataRow in dataTable:
 	f.write(str(dataRow[0])+" "+str(dataRow[1])+" "+str(dataRow[2])+"\n")
 f.close()
-#print(dataTable)
-#print(cc)
-
-
-
-#addStellarCatalog(img,"stellar.dat")
-#plot_image(img, log_scale=True)    
+    
